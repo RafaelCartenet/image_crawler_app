@@ -1,0 +1,9 @@
+requests
+Pillow
+numpy
+opencv-python
+
+Flask
+flask-restful
+
+pymongo

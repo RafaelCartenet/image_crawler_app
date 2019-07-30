@@ -1,48 +1,35 @@
-from flask import Flask, Response, jsonify, make_response
-from mongo_handler import MongoAgent
-# import cv2
-# import base64
+from flask import Flask, jsonify, send_file
+from tools.mongo_handler import MongoAgent
+from io import BytesIO
+
 
 app = Flask(__name__)
 client = MongoAgent('mongodb', 27017)
 
 
-def load_data():
-    data_path = '/usr/data/test.txt'
-    with open(data_path, 'r') as f:
-        data = f.readlines()
-    return jsonify(data)
-
-
-def load_image(md5):
-    return client.get_image_by_md5(md5)
-    # return mongo.send_file(metadata['imageID'])
-    # retval, buffer = cv2.imencode('.png', img)
-    # png_as_text = base64.b64encode(buffer)
-    # response = make_response(png_as_text)
-    # response.headers['Content-Type'] = 'image/png'
-    # return response
-
-
 @app.route('/', methods=['GET'])
 def index():
-    return load_data()
+    images = client.get_all_images_metadata()
+    available = []
+    for metadata in images:
+        available.append(
+            'http://0.0.0.0:5000/image/' + metadata['_id']
+        )
+    return jsonify(available)
 
 
 @app.route('/image/<md5>')
 def image(md5):
-    img = client.get_image_by_md5(md5=md5)
-    data = cv2.imencode('.png', img)[1].tobytes()
-    return Response(data)
-    # return load_image(md5)
-    # response = load_image(md5)
-    # response.content_type = 'image/jpeg'
-    # return response
+    img = client.get_image_object(md5=md5)
+    img_io = BytesIO()
+    img.save(img_io, 'JPEG', quality=70)
+    img_io.seek(0)
+    return send_file(img_io, mimetype='image/jpeg')
 
 
 @app.route('/monitoring', methods=['GET'])
 def monitoring():
-    images = client.get_all_images()
+    images = client.get_all_images_metadata()
     for im in images:
         im.pop('_id')
         im.pop('imageID')

@@ -13,6 +13,16 @@ services:
     depends_on:
       - mongodb
 
+  image_crawler:
+    build: image_crawler
+    container_name: "image_crawler"
+    volumes:
+      - ./image_crawler:/usr/src
+      - ./data:/usr/data
+      - ./tools:/usr/src/tools
+    depends_on:
+      - mongodb
+
   mongodb:
     image: mongo:latest
     container_name: "mongodb"
