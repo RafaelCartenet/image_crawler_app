@@ -18,7 +18,7 @@ def get_image_metadata(pil_img):
     Compute metadata from PIL Image object.
     Get shape and computes md5
     :param pil_img:
-    :return: 
+    :return:
     """
     metadata = {
         'width': pil_img.width,
