@@ -45,12 +45,13 @@ L'ensemble des service est orchestré grâce au fichier _docker_compose_ qui per
 
 J'ai donc réalisé un premier service, *image_crawler*, dont le but est donc de la récupération des images sur les liens fournis dans le fichier *urls.txt*. Le process est relativement simple, il télécharge l'image via l'url, créé un id unique (uuid), et socke l'image id.png dans un dossier temporaire partagé entre les containers grâce aux *volumes*. Si jamais la requête n'aboutit pas (peu importe la raison), le lien est abandonné et un log est envoyé dans la collection **db.insert_logs** décrite plus tard, avec le timestamp actuel.
 
+Il aurait été possible de faire une gestion d'erreur plus solide, faire du retry sur les liens sur lesquels la requête n'a pas aboutis ou logger plus en détail les erreurs.
+
 ## Processing d'image
 
 > - Developper une tache qui calculera la MD5 de l'image
-- Developper une tache qui transformera l'image en niveau de gris avec le calcul suivant: (R + G + B) / 3
-- Developper une tache qui recuperera les outputs des deux precedents workers. Il devra egalement inserer dans une base
-de donnees MongoDB, les informations (md5, l'image en niveau de gris, la hauteur et la largeur de l'image, la date d'insertion).
+> - Developper une tache qui transformera l'image en niveau de gris avec le calcul suivant: (R + G + B) / 3
+> - Developper une tache qui recuperera les outputs des deux precedents workers. Il devra egalement inserer dans une base de donnees MongoDB, les informations (md5, l'image en niveau de gris, la hauteur et la largeur de l'image, la date d'insertion).
 
 Ce second worker, a pour but de process les images se trouvant dans ce dossier temporaire dans lequel le premier worker dépose ses images.
 Il fonctionne grâce à une librairie python appellée _watchdog_ dont le but est de monitorer des "file system events". Il permet en gros de déclencher des process lorsqu'un évènement dans un dossier occure, comme par exemple la création d'un nouveau fichier.
@@ -90,7 +91,7 @@ L'insertion d'image se fait de la sorte:
 
 > - Il ne doit pas y avoir de doublons d'image dans la base MongoDB (unicite du MD5)
 
-Sur MongoDB, l'unicité des documents dans une collection se fait sur le champ _"\_id"_. Pour chaque image, nous générons ses metadata (hauteur, largeur, image) ainsi que son md5. Ce md5 est unique pour chaque image et nous permet de différencier les images et ainsi les stocker avec un id unique. J'ai donc remplis le champ _"\_id"_ par le md5 lors de l'insertion de la collection dans la table. Nous stockons aussi la date d'insertion. Ainsi le schéma d'une collection dans la base est le suivant:
+Sur MongoDB, l'unicité des documents dans une collection se fait sur le champ _"\_id"_. Pour chaque image, nous générons ses metadata (hauteur, largeur, image) ainsi que son md5. Ce md5 est unique pour chaque image et nous permet de différencier les images et ainsi les stocker avec un id unique. J'ai donc remplis le champ _"\_id"_ par le md5 lors de l'insertion de la collection dans la table. Nous stockons aussi la date d'insertion (à titre d'info uniquement). Ainsi le schéma d'une collection dans la base est le suivant:
 
 ```py
 {
@@ -132,22 +133,32 @@ Le succès arrive dans un seul cas:
 
 Dans ce cas là, comme pour un échec, on update un document existant (ou on en créé un nouveau si non existant) en incrémentant le compteur "success" de 1.
 
+## L'API
+
+> - Developper une api en Flask pour visualiser les images stockees dans MongoDB via l'url http://localhost:5000/image/<MD5>
+
+Simplement, j'ai créé un endpoint sur l'API qui permet via la base de données de récupérer l'image en fonction de son md5, le retransformer en image et le render, en utilisant le module pour interférer avec la base de données décrit plus bas. Si le md5 ne correspond à aucune image on affiche rien.
+
+> - Developper une api en Flask de monitoring via l'url http://localhost:5000/monitoring. Cette api devra retourner un
+histogramme decrivant le nombre d'images traitees avec succes ou erreur par interval d'une minute. (Prevoir une collection dans MongoDB pour recuperer ces informations)
+
+Pour ce point j'ai bien, comme décrit plus haut, créé et alimenter cette collection, mais n'ai pas eu le temps de tester quelquechose pour afficher un histogramme, même si les données de la collection sont suffisantes. Pour chaque intervalle sur lequel on a travaillé on a bien le nombre d'images traitées avec succès ou erreur.
+
 ## Tools: MongoAgent
 
 J'ai développé un petit module *MongoAgent* pour interférer avec la base mongodb, qui hérite de la classe *MongoClient* de *pymongo*, qui permet de réaliser facilement toutes les fonctions liées à l'insertion et récupération de collections dans la base mongo.
 
 Il permet de faire toutes les fonctions de get nécessaire dans les différents process et les différentes insertions. Il aurait peut être été plus rigoureux d'avoir un agent par process afin d'éviter que le librairie d'image utilisée pour load les image soient nécessaires dans tous les services utilisant ce module.
 
-## L'API
-
-> - Developper une api en Flask pour visualiser les images stockees dans MongoDB via l'url http://localhost:5000/image/<MD5>
-
-Simplement j'ai créé un endpoint sur l'API qui permet via la base de données de récupérer l'objet, le retransformer en image et le render, en utilisant le module pour interférer avec la base de données décrit plus bas
-
-> - Developper une api en Flask de monitoring via l'url http://localhost:5000/monitoring. Cette api devra retourner un
-histogramme decrivant le nombre d'images traitees avec succes ou erreur par interval d'une minute. (Prevoir une collection dans MongoDB pour recuperer ces informations)
-
-Pour ce point j'ai bien, comme décrit plus haut, créé et alimenter cette collection, mais n'ai pas eu le temps de tester quelquechose pour afficher un histogramme, même si les données de la collection sont suffisantes. pour chaque intervalle sur lequel on a travaillé on a bien le nombre d'images traitées avec succès ou erreur.
+Ce module est utiisé par les trois services:
+- *image_crawler*:
+  - pour insérer un log de fail dans la collection *db.insert_log* en cas d'échec de la requête
+- *image_processor*:
+  - pour insérer un log de fail ou de success dans la collection *db.insert_log* en cas d'échec: si l'image existe déjà
+  - pour insérer l'image et ses metadata dans la collection *db.images*.
+- *api*:
+  - pour récupérer une image pour l'afficher sur le endpoint */image/<md5>*
+  - pour récupérer les insert logs sur le endpoint */monitoring*
 
 ## Scale up?
 
@@ -166,3 +177,5 @@ Si j'avais eu plus de temps, j'aurai implémenté les différents workers néces
 J'aurai également développé un petit bout de front pour pouvoir afficher l'histogramme en fonction des données de la collection. C'est également réalisable avec des librairies comme pygal qui permettent de render des données.
 
 J'aurai passé plus de temps à l'étude de la scalabilité, pour m'assurer que la concurrence des workers ne pose pas de problèmes etc.
+
+J'aurai également passé plus de temps sur la gestion des erreurs, afin de logger en détail les différentes erreurs.
