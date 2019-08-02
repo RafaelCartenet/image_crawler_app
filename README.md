@@ -22,3 +22,8 @@ Notes:
 - Il ne doit pas y avoir de doublons d'image dans la base MongoDB (unicite du MD5)
 - Les technologies autres que celles citees sont libres
 - Le travail sera rendu sur un repo git public
+
+
+## Notes
+
+Le fichier urls.txt doit etre place dans le dossier /data/

@@ -2,7 +2,7 @@ version: '3'
 
 services:
   app:
-    build: api
+    build: ./api
     container_name: "api"
     volumes:
       - ./api:/usr/src/app
@@ -14,14 +14,23 @@ services:
       - mongodb
 
   image_crawler:
-    build: image_crawler
-    container_name: "image_crawler"
+    build: ./image_crawler
     volumes:
       - ./image_crawler:/usr/src
       - ./data:/usr/data
       - ./tools:/usr/src/tools
     depends_on:
       - mongodb
+
+  image_processor:
+    build: ./image_processor
+    volumes:
+      - ./image_processor:/usr/src
+      - ./data:/usr/data
+      - ./tools:/usr/src/tools
+    depends_on:
+      - mongodb
+      - image_crawler
 
   mongodb:
     image: mongo:latest

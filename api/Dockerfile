@@ -1,5 +1,5 @@
 FROM python:3
 COPY . /usr/src/app
-RUN pip3 install -r /usr/src/app/requirements.txt
-RUN pip3 install pymongo
-CMD ["python3", "/usr/src/app/api_2.py"]
+WORKDIR /usr/src/app
+RUN pip install -r requirements.txt
+CMD ["python", "/usr/src/app/api.py"]

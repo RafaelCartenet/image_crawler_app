@@ -1,2 +1,4 @@
+watchdog
 Pillow
+numpy
 pymongo
